@@ -1,0 +1,181 @@
+---
+title: "Patterns of Auto Theft Occurrences in City of Toronto^[Code and data are available at https://github.com/Yiyi0423/sta-304.git]"
+author: "Yiyi Ren 1005979103"
+date: "4/27/2022"
+output: pdf_document
+abstract: Occurrences of auto thefts is an important indicator to show whether a city is safe. Summarizing the pattern, analyzing the results of previous auto theft cases, would be able to help preventing the future occurrences. By analyzing the data, also with the adopted linear regression model, it is able to conclude that neighborhoods which have the largest areas tend to have higher occurrences of auto thefts, especially during nights.
+bibliography: ref_list.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE, include=FALSE}
+library(opendatatoronto)
+library(dplyr)
+library(tidyverse)
+library(patchwork)
+library(ggplot2)
+```
+
+# Introduction
+Auto theft is one of the Major Crime Indicators. The number of auto theft occurrences of neighborhood indicate the safety level of them. Losing of car can be very hard to accept, harmful for one's emotion, even will have consequences including inconvenience and feelings of personal violation. The prevention of auto theft occurrences is crucial for every family and individuals. The city of Toronto is one of the most important and busiest cities in Canada. Despite the importance of preventing auto thefts, there is not very much precious work done to explore this potential connection. This project aims to summarize the pattern of auto theft happened in Toronto from 2014 to 2018, finding the pattern of the occurrences of auto thefts. Hence, provide valid suggestions of how to efficiently prevent auto thefts to Toronto Police.
+The rest of the paper was organized into three major sections. In the Data section, I would first explain the source of the basic data and the methodology I used to process the data. Data definitions and characteristic are explained and included in this major part. In the Results section, I plotted three different figures. Figure 1 shows the distribution of occurrences in terms of time and premise type. Figure 2 is an visualization of the frequency of occurrences, putting in Toronto's map. In figure 3, I adopted a linear regression model for the relationship between area of neighborhoods and occurrences. It was rational to conclude that  
+
+# Data
+The datasets that were used in this project are all provided and downloaded from Open Data Toronto. The City of Toronto’s Open Data Portal is an open source delivery tool which contains a various number of datasets feathering the city of Toronto. The dataset was processed and analyzed in R [@r] and I analyzed all these using R package including: opendatatoronto[@opendata], dplyr[@dplyr], tidyverse[@tidyverse], patchwork[@patchwork] and ggplot2[@ggplot].
+There are a variety of variables included in the dataset of Major Crime Indicators includes crime categories of Assault, Break and Enter, Auto Theft, Robbery and Theft Over. According to the selected subject, only all the variables about Auto Theft were selected. 
+
+## Data Source and Methodology
+Methodology
+The two datasets of ‘auto_theft’ and ‘neighbourhood’ are joined together by the shared variable “Hood_ID”. Informative and useful variables are selected among all variables. A new variable ‘area’ is mutated by pop_2016 divided by pop_density_per_square_km. Another new variable ‘is_night’ would be TRUE is ‘occurrencehour’ is less than 6 or greater than or equal to 18, otherwise FALSE. ‘occurrencedayofweekn’ is weekday converted to number. 
+Overall, there were 30 variables and 18,175 observations. Specially, the variables were:
+\newline
+1.	Index_ and event_unique_id: The unique identifier of the report and the event.\newline
+2.	occurrencedate, occurrenceyear, occurrencemonth, occurrenceday, occurrencedayofyear, occurrencedayofweek and occurrencehour: Time information of the occurrence, including date, year, month day, day of year, day of week and hour. \newline
+3.	reporteddate, reportedyear, reportedmonth, reportedday, reporteddayofyear and reporteddayofweek: Reported time information of the occurrence, including date, year, month, day, day of year, and day of week. \newline
+4.	premisetype: Premise where occurrence took place. \newline
+5.	offence: Offence related to the occurrence. \newline
+6.	MCI: Type of Major Crime Indicators, all are auto theft. \newline
+7.	Division: Division where event occurred. \newline
+8.	Hood_ID and Neighbourhood: Neighbourhood Name and Identificator. \newline
+9.	Long and Lat: Longitude and Latitude of point extracted after offsetting X and & Coordinates to nearest intersection node. \newline
+
+```{r, echo=FALSE, warning=FALSE, include=FALSE}
+days = 1:7
+names(days) <- c("Monday", "Tuesday", "Wednesday", "Thursday",
+                 "Friday", "Saturday", "Sunday")
+
+months = 1:12
+names(months) <- c("January", "February", "March", "April", "May",
+                   "June", "July", "August", "September", "October",
+                   "November", "December")
+
+auto_thefts <- read_csv('auto_thefts.csv') %>%
+  mutate(occurrencedayofweekn = days[occurrencedayofweek],
+         reporteddayofweekn = days[reporteddayofweek],
+         occurencemonthn = months[occurrencemonth],
+         reportedmonthn = months[reportedmonth],
+         hours_diff = (reportedhour - occurrencehour) +
+           (reporteddayofyear - occurrencedayofyear) * 24 +
+           (reportedyear - occurrenceyear) * 24 * 365,
+         is_night = occurrencehour < 6 | occurrencehour >= 18)
+
+neighbourhood <- read_csv('neighbourhood_profiles_2016.csv') %>%
+  mutate(area = pop_2016 / pop_density_per_square_km)
+
+joined <- left_join(auto_thefts, neighbourhood, by = 'Hood_ID')
+
+n_neighbourhood <- joined %>%
+  group_by(Hood_ID) %>%
+  summarize(n = n())
+
+neighbourhood <- left_join(neighbourhood, n_neighbourhood, by = 'Hood_ID')
+
+auto_thefts <- auto_thefts %>%
+  filter(occurrencemonth == "January" | occurrencemonth == "February" | occurrencemonth == "March" | occurrencemonth == "April"| occurrencemonth == "May" | occurrencemonth == "June"| occurrencemonth == "July" | occurrencemonth == "August"| occurrencemonth == "September" | occurrencemonth == "October"| occurrencemonth == "November" | occurrencemonth == "December")
+```
+
+# Result:
+```{r, echo=FALSE, warning=FALSE}
+auto_thefts <- auto_thefts                                                 # Replicate original data
+auto_thefts$occurrencemonth <- factor(auto_thefts$occurrencemonth,                                        # Change ordering manually
+                  levels = c("January", "February", "March", "April", "May",
+                   "June", "July", "August", "September", "October", 
+                   "November", "December"))
+
+ggplot(auto_thefts) +
+  aes(x = occurrencemonth) +
+  geom_bar(fill = "lightblue") +
+  labs(x = "Occurrence month", title="Fig.1a: Distribution of occurrences in terms of month") 
+```
+
+```{r, echo=FALSE, warning=FALSE}
+auto_thefts <- auto_thefts                                                 # Replicate original data
+# Change ordering manually
+auto_thefts$occurrencedayofweek <- factor(auto_thefts$occurrencedayofweek,                              
+                    levels = c("Monday", "Tuesday", "Wednesday", "Thursday",
+                    "Friday", "Saturday", "Sunday"))
+ggplot(auto_thefts) +
+  aes(x = occurrencedayofweek) +
+  geom_bar(fill = "darkseagreen3") + 
+  labs(x = "Occurrence Day of Week", title="Fig.1b: Distribution of occurrences in terms of days in a week")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+ggplot(auto_thefts) +
+  aes(x = occurrencehour) +
+  geom_bar(fill = "darkslategrey") +
+  geom_vline(xintercept = 5.5, color = 'blue') +
+  geom_vline(xintercept = 17.5, color = 'blue') + 
+  labs(x = "Occurrence hour", title="Fig.1c: Distribution of occurrences in terms of hours in a day")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+ggplot(auto_thefts) +
+  aes(x = premisetype) +
+  geom_bar(fill = "lightpink") + 
+  labs(x = "Premise Type", title="Fig.1d: Distribution of occurrences in terms of premise type")
+```
+
+Figure 1 shows the distribution of occurrences by different time variables, including month, week, and hours in a day, also Premise type. Panel a of Figure 1 shows the distribution of occurrences in terms of months, the bar plot illustrates that we January and February had the least number of occurrences, October and November had the greatest number of cases. However, panel b suggests that each day of week had almost equal number of occurrences, with a slightly higher number of cases happened on Friday and a low peak on Sunday. Panel c illustrates the distribution of occurrences in terms of hours in a day. The two v-lines separate occurrences of day (06:00-18:00) and night. From the shape of the graph, there are apparently more occurrences of auto theft cases during the nights. Only around 37.666% of auto thefts cases happened during the daytime. Panel d of figure 1 shows the distribution of occurrence in terms of premise types. There exist obvious differences between the bars. We can see there are a significantly more auto theft cases happened in outside. Also, a considerably auto thefts happened in houses. 
+
+```{r, echo=FALSE}
+# Figure 2
+ggplot(auto_thefts) +
+  aes(x = Long, y = Lat, colour = Division) +
+  geom_point(alpha = 0.05) +
+  ggtitle('Fig.2: Frequency of Occurrences in Divisions')
+```
+
+Figure 2 is a scatterplot created by the latitude and longitude of point extracted after offsetting X and Coordinates to nearest intersection node. The plot therefore shows the map of city of Toronto. The different colors represent different divisions. The darker the points are, the more occurrences of auto-thefts happened in this specific location. In each division, there are several dark points, which means the auto thefts cases are separated in the city of Toronto. Each division has 
+
+## Linear Regression Model
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+# Figure 3
+ggplot(neighbourhood) +
+  aes(x = area, y = n) +
+  geom_point() + ggtitle('Fig.3a: Relationship between area of neighbourhoods and occurrences') + theme(plot.title = element_text(size = 12))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+ggplot(neighbourhood) +
+  aes(x = area, y = n) +
+  geom_point() + 
+  ggtitle('Fig.3b: Linear regression model between area of neighbourhoods and occurrences') +
+  geom_smooth(method='lm', se=FALSE)
+```
+
+```{r, echo=FALSE, message=FALSE, include=FALSE, warning=FALSE, fig.height=3}
+
+# Calculate the correlation between area and the occurrence times.
+cor(neighbourhood$area, neighbourhood$n)
+
+mod_occu <- lm(area ~ n, data = neighbourhood)
+summary(mod_occu)$coefficients
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+neighbourhood_2 <- neighbourhood %>%
+  filter(area <= 20)
+
+ggplot(data = neighbourhood_2, aes(x = area, y = n)) +
+  geom_point() +
+  ggtitle('Fig.3c: Enhanced linear regression model between area of neighbourhoods and occurrences') +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+Figure 3 panel a shows the relationship between area of neighborhood and occurrences of auto theft. The variable area, in square kilometers, was calculated by population divided by population density per square kilometer. We then adopted a linear regression model for this relationship as shown in panel b. Outliers including extreme high number of occurrence and very large area, but small number of occurrences were removed. Panel c visualizes the regression model which reduced the outliers. By calculation, the correlation between area and number of occurrences is about 0.7, which indicates the relationship between the area of each neighborhood and occurrences of auto theft is linear, strong and positive. 
+
+To check how well this fitted regression line preform as a predictive model, we first randomly picked 80% of the observations in the dataset neighborhood as training dataset. Then made the rest of the observations become testing dataset. After that, training dataset was used to fit the predictive model. Made the predictions for the testing dataset and compare the predictions to the true responses.
+The RMSE for the predictions in the testing dataset is 2.11139. The RMSE for the predictions in the training dataset is 2.030258. The difference of the RMSEs of the training and testing datasets is not too big, thus, the predictive model is generalizing well.
+
+# Discussion
+## Discussion of Research Findings
+There is positively strong linear relationship between number of auto thefts and area of neighborhood. A greater number of auto thefts occurred at nights than days, around 37%-38% of cased happened during days. Therefore, we suggest the Toronto Police to send extra police to those neighborhoods which have the largest areas (Hood_1, Hood_131, Hood_14), especially during nights.
+The results and findings of the current research can help people selecting household address and neighborhoods in terms of safety, using auto theft occurrences as an example. Moreover, the insurance company can use the results to adopt different vehicle insurance fare. 
+
+## Weakness
+The data set is incomplete due to privacy considerations, which could result to inaccuracy of occurrences count. To diminishing the effect of the pandemic, only the data before COVID-19 was selected to be included in the dataset. General pattern should not be affected, however, the prediction of future a few years would be not as accurate as if the recent two years’ data was included. For similar reasons, the resulting prediction may not have long-lasting significance.
+
+# Reference
